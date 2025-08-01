@@ -73,7 +73,7 @@ def get_emails():
             # 如果 MAILBOX 存在，则按 mailbox 过滤邮件
             cursor.execute("""
                 SELECT id, subject, from_name, from_email, received_date, 
-                       raw_email_body, analysis_markdown, analysis_json, mailbox
+                       raw_email_body, analysis_markdown, analysis_json, mailbox, is_starred, is_read
                 FROM emails 
                 WHERE mailbox = ?
                 ORDER BY received_date DESC
@@ -83,7 +83,7 @@ def get_emails():
             # 如果 MAILBOX 不存在，则获取所有邮件（或者可以定义一个默认行为）
             cursor.execute("""
                 SELECT id, subject, from_name, from_email, received_date, 
-                       raw_email_body, analysis_markdown, analysis_json, mailbox
+                       raw_email_body, analysis_markdown, analysis_json, mailbox, is_starred, is_read
                 FROM emails 
                 ORDER BY received_date DESC
             """)
@@ -112,6 +112,79 @@ def get_emails():
         logging.error(f"获取邮件时发生错误: {e}", exc_info=True)
         return jsonify({"error": "服务器内部错误", "message": str(e)}), 500
 
+@app.route('/api/emails/<int:email_id>/status', methods=['PUT'])
+def update_email_status(email_id):
+    """
+    更新邮件的星标或已读状态。
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "请求体为空或不是有效的JSON"}), 400
+
+    is_starred = data.get('is_starred')
+    is_read = data.get('is_read')
+
+    if is_starred is None and is_read is None:
+        return jsonify({"error": "未提供有效的更新字段 (is_starred, is_read)"}), 400
+
+    try:
+        from backend.data_storage.email_data_manager import EmailDataManager
+        manager = EmailDataManager()
+        
+        manager.update_email_status(email_id, is_starred=is_starred, is_read=is_read)
+        
+        # 获取更新后的邮件数据并返回
+        updated_email = manager.get_email_by_id(email_id)
+        manager.close()
+        
+        if updated_email:
+            # 确保 analysis_json 是一个字典
+            if isinstance(updated_email.get('analysis_json'), str):
+                try:
+                    updated_email['analysis_json'] = json.loads(updated_email['analysis_json'])
+                except json.JSONDecodeError:
+                    updated_email['analysis_json'] = {}
+            return jsonify(updated_email), 200
+        else:
+            return jsonify({"error": f"未找到邮件 ID {email_id}"}), 404
+            
+    except Exception as e:
+        logging.error(f"更新邮件 ID {email_id} 状态时发生错误: {e}", exc_info=True)
+        return jsonify({"error": "服务器内部错误", "message": str(e)}), 500
+
+@app.route('/api/emails/<int:email_id>/urgency', methods=['PUT'])
+def update_email_urgency(email_id):
+    """
+    更新邮件的紧急程度。
+    """
+    data = request.get_json()
+    if not data or 'urgency' not in data:
+        return jsonify({"error": "请求体必须包含 'urgency' 字段"}), 400
+
+    new_urgency = data['urgency']
+    
+    try:
+        from backend.data_storage.email_data_manager import EmailDataManager
+        manager = EmailDataManager()
+        
+        updated_email = manager.update_email_urgency(email_id, new_urgency)
+        manager.close()
+        
+        if updated_email:
+            # 确保 analysis_json 是一个字典
+            if isinstance(updated_email.get('analysis_json'), str):
+                try:
+                    updated_email['analysis_json'] = json.loads(updated_email['analysis_json'])
+                except json.JSONDecodeError:
+                    updated_email['analysis_json'] = {}
+            return jsonify(updated_email), 200
+        else:
+            return jsonify({"error": f"更新邮件 ID {email_id} 紧急程度时失败"}), 404
+            
+    except Exception as e:
+        logging.error(f"更新邮件 ID {email_id} 紧急程度时发生错误: {e}", exc_info=True)
+        return jsonify({"error": "服务器内部错误", "message": str(e)}), 500
+
 @app.route('/api/sync-emails', methods=['POST', 'GET'])
 def sync_emails():
     """触发邮件同步和数据库整理，并以流式响应返回实时日志。"""
@@ -126,7 +199,7 @@ def sync_emails():
 
             scripts = [
                 ("邮件更新", os.path.join(os.getcwd(), 'backend', 'update_emails.py')),
-                ("数据库整理", os.path.join(os.getcwd(), 'backend', 'organize_database.py'))
+                # ("数据库整理", os.path.join(os.getcwd(), 'backend', 'organize_database.py'))
             ]
 
             for name, script_path in scripts:

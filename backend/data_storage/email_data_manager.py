@@ -46,6 +46,8 @@ class EmailDataManager:
                     analysis_markdown TEXT,
                     analysis_json TEXT,
                     mailbox TEXT,
+                    is_starred INTEGER DEFAULT 0,
+                    is_read INTEGER DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
@@ -176,6 +178,22 @@ class EmailDataManager:
         except Exception as e:
             logging.error(f"解析或存储过程中发生错误: {e}")
 
+    def get_email_by_id(self, email_id):
+        """
+        根据邮件ID获取单个邮件的完整数据。
+        """
+        try:
+            # 使用 row_factory 使结果可以按列名访问
+            self.conn.row_factory = sqlite3.Row
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM emails WHERE id = ?", (email_id,))
+            row = cursor.fetchone()
+            self.conn.row_factory = None # 重置 row_factory
+            return dict(row) if row else None
+        except sqlite3.Error as e:
+            logging.error(f"获取邮件 ID: {email_id} 失败: {e}")
+            return None
+
     def get_all_emails_for_reprocessing(self):
         """
         获取所有需要重新处理的邮件 (id 和 analysis_markdown)。
@@ -203,6 +221,102 @@ class EmailDataManager:
             logging.info(f"成功更新邮件 ID: {email_id} 的分析数据。")
         except sqlite3.Error as e:
             logging.error(f"更新邮件 ID: {email_id} 失败: {e}")
+
+    def update_email_status(self, email_id, is_starred=None, is_read=None):
+        """
+        根据邮件ID更新邮件的星标或已读状态。
+        """
+        try:
+            cursor = self.conn.cursor()
+            updates = []
+            params = []
+
+            if is_starred is not None:
+                updates.append("is_starred = ?")
+                params.append(1 if is_starred else 0)
+            if is_read is not None:
+                updates.append("is_read = ?")
+                params.append(1 if is_read else 0)
+
+            if not updates:
+                logging.warning(f"未为邮件 ID: {email_id} 提供任何更新字段。")
+                return
+
+            query = f"UPDATE emails SET {', '.join(updates)} WHERE id = ?"
+            params.append(email_id)
+
+            cursor.execute(query, tuple(params))
+            self.conn.commit()
+            logging.info(f"成功更新邮件 ID: {email_id} 的状态。")
+        except sqlite3.Error as e:
+            logging.error(f"更新邮件 ID: {email_id} 状态失败: {e}")
+
+    def update_email_urgency(self, email_id, new_urgency):
+        """
+        更新指定邮件的紧急程度。
+        这将修改 analysis_markdown 和 analysis_json。
+        """
+        try:
+            email = self.get_email_by_id(email_id)
+            if not email:
+                logging.error(f"未找到邮件 ID: {email_id}，无法更新紧急程度。")
+                return None
+
+            # 1. 更新 analysis_json
+            analysis_json_str = email.get('analysis_json', '{}')
+            analysis_data = json.loads(analysis_json_str)
+
+            urgency_keys = ['邮件紧急程度评估', '郵件緊急程度評估']
+            urgency_field_keys = ['- **紧急程度**', '- **緊急程度**']
+            
+            updated_json = False
+            for key in urgency_keys:
+                if key in analysis_data and isinstance(analysis_data.get(key), list) and analysis_data.get(key):
+                    for field_key in urgency_field_keys:
+                        if field_key in analysis_data[key][0]:
+                            analysis_data[key][0][field_key] = new_urgency
+                            updated_json = True
+                            break
+                if updated_json:
+                    break
+            
+            if not updated_json:
+                logging.warning(f"在邮件 ID: {email_id} 的 JSON 中未找到紧急程度字段，将创建它。")
+                # 确保主键存在
+                if urgency_keys[0] not in analysis_data:
+                    analysis_data[urgency_keys[0]] = []
+                # 确保列表不为空
+                if not analysis_data[urgency_keys[0]]:
+                    analysis_data[urgency_keys[0]].append({})
+                # 设置值
+                analysis_data[urgency_keys[0]][0][urgency_field_keys[0]] = new_urgency
+
+            new_json_str = json.dumps(analysis_data, ensure_ascii=False, indent=4)
+
+            # 2. 更新 analysis_markdown
+            analysis_markdown = email.get('analysis_markdown', '')
+            # 正则表达式匹配 "- **紧急程度**: xxx" 或 "- **緊急程度**: xxx"
+            urgency_pattern = re.compile(r"(-\s*\*\*(?:紧急|緊急)程度\*\*:\s*)(.*)", re.IGNORECASE)
+            
+            if urgency_pattern.search(analysis_markdown):
+                new_markdown = urgency_pattern.sub(r"\1" + new_urgency, analysis_markdown)
+            else:
+                # 如果在markdown中找不到，则在末尾追加
+                logging.warning(f"在邮件 ID: {email_id} 的 Markdown 中未找到紧急程度部分，将进行追加。")
+                new_markdown = analysis_markdown.strip() + f"\n\n### 邮件紧急程度评估\n\n- **紧急程度**: {new_urgency}\n"
+
+            # 3. 保存回数据库
+            self.update_analysis_data(email_id, new_markdown, new_json_str)
+            
+            # 返回更新后的完整邮件数据
+            return self.get_email_by_id(email_id)
+
+        except json.JSONDecodeError as e:
+            logging.error(f"解析邮件 ID: {email_id} 的 JSON 失败: {e}")
+            return None
+        except Exception as e:
+            logging.error(f"更新邮件 ID: {email_id} 紧急程度时发生未知错误: {e}")
+            return None
 
     def close(self):
         """

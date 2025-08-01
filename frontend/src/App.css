@@ -62,21 +62,41 @@ body {
   color: white;
 }
 
-.filter-container {
+.filter-container-single {
   padding: 15px 20px;
   border-bottom: 1px solid #dfe1e6;
+  display: flex;
+  justify-content: space-around;
+  gap: 10px;
 }
 
-.filter-container label {
-  margin-right: 10px;
-  font-weight: 600;
+.filter-button-single {
+    flex-grow: 1;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: background-color 0.3s, color 0.3s;
+    white-space: nowrap;
 }
 
-.filter-container select {
-  padding: 5px 8px;
-  border-radius: 3px;
-  border: 1px solid #ccc;
-}
+/* Urgency States */
+.filter-button-single.urgency-all { background-color: #6c757d; color: white; }
+.filter-button-single.urgency-高 { background-color: #de350b; color: white; }
+.filter-button-single.urgency-中 { background-color: #ffab00; color: black; }
+.filter-button-single.urgency-低 { background-color: #36b37e; color: white; }
+
+/* Read States */
+.filter-button-single.read-all { background-color: #6c757d; color: white; }
+.filter-button-single.read-read { background-color: #0052cc; color: white; }
+.filter-button-single.read-unread { background-color: #f0f0f0; color: #333; }
+
+/* Starred States */
+.filter-button-single.starred-all { background-color: #6c757d; color: white; }
+.filter-button-single.starred-starred { background-color: gold; color: #333; }
+
 
 .email-list {
   overflow-y: scroll; /* 强制显示滚动条 */
@@ -157,12 +177,19 @@ body {
   background-color: #e6f7ff;
 }
 
+.email-item-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
 .email-subject {
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   margin-bottom: 4px;
+  flex-grow: 1; /* 允许主题占据更多空间 */
 }
 
 .email-subject.urgency-high {
@@ -182,6 +209,21 @@ body {
   color: #5e6c84;
 }
 
+.email-read {
+    background-color: #f8f9fa; /* 已读邮件的背景色 */
+    color: #6c757d; /* 已读邮件的文字颜色 */
+}
+
+.email-read .email-subject {
+    font-weight: normal; /* 已读邮件主题不加粗 */
+}
+
+.star-icon {
+    color: gold; /* 星标颜色 */
+    font-size: 1.2em;
+    margin-left: 8px;
+}
+
 /* 主内容区域 */
 .main-content {
   flex-grow: 1;
@@ -189,6 +231,7 @@ body {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  position: relative; /* 为悬浮按钮组提供定位上下文 */
 }
 
 .email-detail-placeholder {
@@ -258,6 +301,66 @@ body {
 
 .email-analysis-content ul, .email-analysis-content ol {
     padding-left: 20px;
+}
+
+/* 悬浮按钮组 */
+.email-actions-floating {
+    position: absolute;
+    right: 20px; /* 距离右侧20px */
+    top: 50%; /* 垂直居中 */
+    transform: translateY(-50%); /* 精确垂直居中 */
+    display: flex;
+    flex-direction: column;
+    gap: 10px; /* 按钮之间的间距 */
+    background-color: rgba(255, 255, 255, 0.9); /* 半透明背景 */
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 100; /* 确保在其他内容之上 */
+}
+
+.email-actions-floating .action-button {
+    width: 40px; /* 固定按钮宽度 */
+    height: 40px; /* 固定按钮高度 */
+    border-radius: 50%; /* 圆形按钮 */
+    border: 1px solid #ccc;
+    background-color: #f0f0f0;
+    color: #333;
+    font-size: 1.2rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.email-actions-floating .action-button:hover {
+    background-color: #e6f7ff;
+    border-color: #0052cc;
+    color: #0052cc;
+}
+
+.email-actions-floating .action-button.starred {
+    background-color: gold;
+    border-color: orange;
+    color: white;
+}
+
+.email-actions-floating .action-button.read {
+    background-color: #36b37e; /* 绿色 */
+    border-color: #28a745;
+    color: white;
+}
+
+.email-actions-floating .urgency-select {
+    width: auto; /* 允许选择框根据内容调整宽度 */
+    border-radius: 4px;
+    padding: 5px 8px;
+    font-size: 0.9rem;
+    background-color: #f0f0f0;
+    color: #333;
+    border: 1px solid #ccc;
+    cursor: pointer;
 }
 
 /* 加载和错误状态 */

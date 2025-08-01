@@ -4,7 +4,7 @@ import './App.css';
 import SettingsPage from './SettingsPage'; // 引入设置页面组件
 
 // 将子组件拆分到单独的文件中以保持整洁
-const Sidebar = ({ groupedEmails, onSelectEmail, onFilterChange, urgencyFilter, onSync, onShowSettings }) => {
+const Sidebar = ({ groupedEmails, onSelectEmail, onFilterChange, onSync, onShowSettings }) => {
     const [expanded, setExpanded] = useState(() => {
         // 默认展开所有年份
         const initialExpanded = {};
@@ -80,6 +80,30 @@ const Sidebar = ({ groupedEmails, onSelectEmail, onFilterChange, urgencyFilter, 
         });
     };
 
+    const {
+        onUrgencyCycle,
+        onReadCycle,
+        onStarredCycle,
+        urgencyFilter,
+        readFilter,
+        starredFilter
+    } = onFilterChange;
+
+    const getUrgencyButtonText = () => {
+        const map = { 'all': '全', '高': '高', '中': '中', '低': '低' };
+        return map[urgencyFilter];
+    };
+
+    const getReadButtonText = () => {
+        const map = { 'all': '全部', 'read': '已读', 'unread': '未读' };
+        return map[readFilter];
+    };
+
+    const getStarredButtonText = () => {
+        const map = { 'all': '全部', 'starred': '加星' };
+        return map[starredFilter];
+    };
+
     return (
         <div className="sidebar">
             <div className="sidebar-header">
@@ -89,14 +113,16 @@ const Sidebar = ({ groupedEmails, onSelectEmail, onFilterChange, urgencyFilter, 
                     <button onClick={onShowSettings} className="settings-button">设置</button>
                 </div>
             </div>
-            <div className="filter-container">
-                <label htmlFor="urgency-filter">筛选紧急程度: </label>
-                <select id="urgency-filter" value={urgencyFilter} onChange={e => onFilterChange(e.target.value)}>
-                    <option value="all">全部</option>
-                    <option value="高">高</option>
-                    <option value="中">中</option>
-                    <option value="低">低</option>
-                </select>
+            <div className="filter-container-single">
+                <button onClick={onUrgencyCycle} className={`filter-button-single urgency-${urgencyFilter}`}>
+                    {getUrgencyButtonText()}
+                </button>
+                <button onClick={onReadCycle} className={`filter-button-single read-${readFilter}`}>
+                    {getReadButtonText()}
+                </button>
+                <button onClick={onStarredCycle} className={`filter-button-single starred-${starredFilter}`}>
+                    {getStarredButtonText()}
+                </button>
             </div>
             <div className="email-list">
                 {Object.keys(groupedEmails).sort((a, b) => b - a).map(year => {
@@ -130,8 +156,11 @@ const Sidebar = ({ groupedEmails, onSelectEmail, onFilterChange, urgencyFilter, 
                                                     const summaryBlock = email.analysis_json?.['邮件摘要'] || email.analysis_json?.['郵件摘要'];
                                                     const summary = summaryBlock?.[0]?.['**主题**'] || summaryBlock?.[0]?.['**主題**'] || email.subject;
                                                     return (
-                                                        <div key={email.id} className="email-item" onClick={() => onSelectEmail(email)}>
-                                                            <div className={`email-subject ${getUrgencyClass(email)}`}>{summary}</div>
+                                                        <div key={email.id} className={`email-item ${email.is_read ? 'email-read' : ''}`} onClick={() => onSelectEmail(email)}>
+                                                            <div className="email-item-header">
+                                                                <div className={`email-subject ${getUrgencyClass(email)}`}>{summary}</div>
+                                                                {email.is_starred ? <span className="star-icon">★</span> : null}
+                                                            </div>
                                                             <div className="email-from">{email.from_name || email.from_email}</div>
                                                         </div>
                                                     );
@@ -229,8 +258,67 @@ const EmailAnalysis = ({ analysis_markdown }) => {
     );
 };
 
+const EmailActions = ({ email, onUpdateEmail, onUpdateUrgency }) => {
+    const handleStarToggle = () => {
+        onUpdateEmail(email.id, { is_starred: !email.is_starred });
+    };
 
-const EmailDetail = ({ email }) => {
+    const handleReadToggle = () => {
+        onUpdateEmail(email.id, { is_read: !email.is_read });
+    };
+
+    const urgencyBlock = email.analysis_json?.['邮件紧急程度评估'] || email.analysis_json?.['郵件緊急程度評估'];
+    const currentUrgency = urgencyBlock?.[0]?.['- **紧急程度**'] || urgencyBlock?.[0]?.['- **緊急程度**'] || '未评估';
+
+    const handleUrgencyCycle = () => {
+        const urgencyLevels = ['低', '中', '高'];
+        const currentIndex = urgencyLevels.indexOf(currentUrgency);
+        const nextIndex = (currentIndex + 1) % urgencyLevels.length;
+        const newUrgency = urgencyLevels[nextIndex];
+        onUpdateUrgency(email.id, newUrgency);
+    };
+
+    const getUrgencyEmoji = () => {
+        switch (currentUrgency) {
+            case '高':
+                return '🔥'; // Fire for high
+            case '中':
+                return '⚠️'; // Warning for medium
+            case '低':
+                return '🟢'; // Green circle for low
+            default:
+                return '⚪'; // White circle for not assessed
+        }
+    };
+
+    return (
+        <div className="email-actions-floating">
+            <button 
+                onClick={handleStarToggle} 
+                className={`action-button ${email.is_starred ? 'starred' : ''}`}
+                title={email.is_starred ? '取消星标' : '星标'}
+            >
+                {email.is_starred ? '★' : '☆'}
+            </button>
+            <button 
+                onClick={handleReadToggle} 
+                className={`action-button ${email.is_read ? 'read' : ''}`}
+                title={email.is_read ? '标记为未读' : '标记为已读'}
+            >
+                {email.is_read ? '✓' : '✉'}
+            </button>
+            <button 
+                onClick={handleUrgencyCycle} 
+                className="action-button urgency-button"
+                title={`循环紧急程度 (当前: ${currentUrgency})`}
+            >
+                {getUrgencyEmoji()}
+            </button>
+        </div>
+    );
+};
+
+const EmailDetail = ({ email, onUpdateEmail, onUpdateUrgency }) => {
     if (!email) {
         return <div className="email-detail-placeholder">请在左侧选择一封邮件查看详情</div>;
     }
@@ -239,10 +327,10 @@ const EmailDetail = ({ email }) => {
         <div className="email-detail-view">
             <EmailBody raw_email_body={email.raw_email_body} />
             <EmailAnalysis analysis_markdown={email.analysis_markdown} />
+            <EmailActions email={email} onUpdateEmail={onUpdateEmail} onUpdateUrgency={onUpdateUrgency} />
         </div>
     );
 };
-
 
 const SyncLogModal = ({ logs, show, onClose }) => {
     const logContentRef = React.useRef(null);
@@ -274,11 +362,100 @@ function App() {
     const [emails, setEmails] = useState([]);
     const [selectedEmail, setSelectedEmail] = useState(null);
     const [urgencyFilter, setUrgencyFilter] = useState('all'); // 'all', '高', '中', '低'
+    const [readFilter, setReadFilter] = useState('all'); // 'all', 'read', 'unread'
+    const [starredFilter, setStarredFilter] = useState('all'); // 'all', 'starred'
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showSettings, setShowSettings] = useState(false); // 控制是否显示设置页面
     const [showSyncLog, setShowSyncLog] = useState(false);
     const [syncLogs, setSyncLogs] = useState([]);
+
+    const handleUrgencyCycle = () => {
+        const states = ['all', '高', '中', '低'];
+        const currentIndex = states.indexOf(urgencyFilter);
+        const nextIndex = (currentIndex + 1) % states.length;
+        setUrgencyFilter(states[nextIndex]);
+    };
+
+    const handleReadCycle = () => {
+        const states = ['all', 'unread', 'read'];
+        const currentIndex = states.indexOf(readFilter);
+        const nextIndex = (currentIndex + 1) % states.length;
+        setReadFilter(states[nextIndex]);
+    };
+
+    const handleStarredCycle = () => {
+        const states = ['all', 'starred'];
+        const currentIndex = states.indexOf(starredFilter);
+        const nextIndex = (currentIndex + 1) % states.length;
+        setStarredFilter(states[nextIndex]);
+    };
+
+    const handleUpdateEmailStatus = useCallback(async (emailId, updates) => {
+        try {
+            const response = await fetch(`http://localhost:5001/api/emails/${emailId}/status`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(updates),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP 错误! 状态: ${response.status}`);
+            }
+
+            const updatedEmail = await response.json();
+            console.log("邮件更新成功:", updatedEmail);
+
+            // 更新前端的邮件列表和选中的邮件
+            setEmails(prevEmails =>
+                prevEmails.map(email =>
+                    email.id === emailId ? updatedEmail : email
+                )
+            );
+            setSelectedEmail(prevSelected =>
+                prevSelected && prevSelected.id === emailId ? updatedEmail : prevSelected
+            );
+
+        } catch (e) {
+            console.error("更新邮件状态失败:", e);
+            setError(e.message);
+        }
+    }, []);
+
+    const handleUpdateUrgency = useCallback(async (emailId, newUrgency) => {
+        try {
+            const response = await fetch(`http://localhost:5001/api/emails/${emailId}/urgency`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ urgency: newUrgency }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP 错误! 状态: ${response.status}`);
+            }
+
+            const updatedEmail = await response.json();
+            console.log("邮件紧急程度更新成功:", updatedEmail);
+
+            // 更新前端的邮件列表和选中的邮件
+            setEmails(prevEmails =>
+                prevEmails.map(email =>
+                    email.id === emailId ? updatedEmail : email
+                )
+            );
+            setSelectedEmail(prevSelected =>
+                prevSelected && prevSelected.id === emailId ? updatedEmail : prevSelected
+            );
+
+        } catch (e) {
+            console.error("更新邮件紧急程度失败:", e);
+            setError(e.message);
+        }
+    }, []);
 
     const fetchEmails = useCallback(async () => {
         try {
@@ -323,6 +500,7 @@ function App() {
                 eventSource.close();
                 // 刷新邮件数据
                 fetchEmails();
+                setSelectedEmail(null); // 同步完成后清除选中的邮件，强制刷新详情页
                 // 2秒后自动关闭模态框
                 setTimeout(() => {
                     setShowSyncLog(false);
@@ -340,15 +518,24 @@ function App() {
     };
 
     const filteredEmails = useMemo(() => {
-        if (urgencyFilter === 'all') {
-            return emails;
-        }
         return emails.filter(email => {
+            // 紧急程度过滤
             const urgencyBlock = email.analysis_json?.['邮件紧急程度评估'] || email.analysis_json?.['郵件緊急程度評估'];
             const urgency = urgencyBlock?.[0]?.['- **紧急程度**'] || urgencyBlock?.[0]?.['- **緊急程度**'];
-            return urgency === urgencyFilter;
+            const matchesUrgency = urgencyFilter === 'all' || urgency === urgencyFilter;
+
+            // 已读/未读过滤
+            const matchesReadStatus = readFilter === 'all' || 
+                                      (readFilter === 'read' && email.is_read) || 
+                                      (readFilter === 'unread' && !email.is_read);
+
+            // 星标过滤
+            const matchesStarredStatus = starredFilter === 'all' || 
+                                         (starredFilter === 'starred' && email.is_starred);
+
+            return matchesUrgency && matchesReadStatus && matchesStarredStatus;
         });
-    }, [emails, urgencyFilter]);
+    }, [emails, urgencyFilter, readFilter, starredFilter]);
 
     const groupedEmails = useMemo(() => {
         const groups = {};
@@ -392,13 +579,23 @@ function App() {
                     <Sidebar 
                         groupedEmails={groupedEmails} 
                         onSelectEmail={setSelectedEmail}
-                        onFilterChange={setUrgencyFilter}
-                        urgencyFilter={urgencyFilter}
+                        onFilterChange={{
+                            onUrgencyCycle: handleUrgencyCycle,
+                            onReadCycle: handleReadCycle,
+                            onStarredCycle: handleStarredCycle,
+                            urgencyFilter,
+                            readFilter,
+                            starredFilter
+                        }}
                         onSync={handleSync}
                         onShowSettings={() => setShowSettings(true)}
                     />
                     <main className="main-content">
-                        <EmailDetail email={selectedEmail} />
+                        <EmailDetail 
+                            email={selectedEmail} 
+                            onUpdateEmail={handleUpdateEmailStatus} 
+                            onUpdateUrgency={handleUpdateUrgency} 
+                        />
                     </main>
                 </>
             )}
