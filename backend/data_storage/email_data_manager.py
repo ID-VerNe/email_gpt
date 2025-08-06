@@ -24,6 +24,7 @@ class EmailDataManager:
         try:
             self.conn = sqlite3.connect(self.db_path)
             self._create_table()
+            self._migrate_schema() # 确保数据库结构是最新的
             logging.info(f"成功连接到数据库: {self.db_path}")
         except sqlite3.Error as e:
             logging.error(f"数据库连接失败: {e}")
@@ -55,6 +56,23 @@ class EmailDataManager:
             logging.info("表 'emails' 已成功创建或已存在。")
         except sqlite3.Error as e:
             logging.error(f"创建表失败: {e}")
+
+    def _migrate_schema(self):
+        """
+        检查并更新数据库表结构，实现简单的迁移。
+        """
+        try:
+            cursor = self.conn.cursor()
+            # 检查 'manually_marked_unread' 列是否存在
+            cursor.execute("PRAGMA table_info(emails)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if 'manually_marked_unread' not in columns:
+                logging.info("正在向 'emails' 表添加 'manually_marked_unread' 列...")
+                cursor.execute("ALTER TABLE emails ADD COLUMN manually_marked_unread BOOLEAN DEFAULT 0")
+                self.conn.commit()
+                logging.info("列 'manually_marked_unread' 添加成功。")
+        except sqlite3.Error as e:
+            logging.error(f"数据库迁移失败: {e}")
 
     def _parse_from_address(self, from_string):
         """
@@ -183,28 +201,51 @@ class EmailDataManager:
         根据邮件ID获取单个邮件的完整数据。
         """
         try:
-            # 使用 row_factory 使结果可以按列名访问
             self.conn.row_factory = sqlite3.Row
             cursor = self.conn.cursor()
-            cursor.execute("SELECT * FROM emails WHERE id = ?", (email_id,))
+            # 使用 COALESCE 确保即使列刚被添加（值为NULL），也能返回一个默认值
+            cursor.execute("""
+                SELECT id, subject, from_name, from_email, received_date, 
+                       raw_email_body, analysis_markdown, analysis_json, mailbox, is_starred, is_read,
+                       COALESCE(manually_marked_unread, 0) as manually_marked_unread
+                FROM emails WHERE id = ?
+            """, (email_id,))
             row = cursor.fetchone()
-            self.conn.row_factory = None # 重置 row_factory
             return dict(row) if row else None
         except sqlite3.Error as e:
             logging.error(f"获取邮件 ID: {email_id} 失败: {e}")
             return None
+        finally:
+            self.conn.row_factory = None # 确保在任何情况下都重置 row_factory
 
-    def get_all_emails_for_reprocessing(self):
+    def get_all_emails(self, mailbox_filter=None):
         """
-        获取所有需要重新处理的邮件 (id 和 analysis_markdown)。
+        获取所有邮件数据，可选择按邮箱过滤。
         """
         try:
+            self.conn.row_factory = sqlite3.Row
             cursor = self.conn.cursor()
-            cursor.execute("SELECT id, analysis_markdown FROM emails")
-            return cursor.fetchall()
+            
+            base_query = """
+                SELECT id, subject, from_name, from_email, received_date, 
+                       raw_email_body, analysis_markdown, analysis_json, mailbox, is_starred, is_read,
+                       COALESCE(manually_marked_unread, 0) as manually_marked_unread
+                FROM emails 
+            """
+
+            if mailbox_filter:
+                cursor.execute(base_query + "WHERE mailbox = ? ORDER BY received_date DESC", (mailbox_filter,))
+            else:
+                cursor.execute(base_query + "ORDER BY received_date DESC")
+
+            rows = cursor.fetchall()
+            # 将 Row 对象转换为字典列表
+            return [dict(row) for row in rows]
         except sqlite3.Error as e:
             logging.error(f"获取所有邮件失败: {e}")
             return []
+        finally:
+            self.conn.row_factory = None
 
     def update_analysis_data(self, email_id, new_markdown, new_json):
         """
@@ -225,27 +266,32 @@ class EmailDataManager:
     def update_email_status(self, email_id, is_starred=None, is_read=None):
         """
         根据邮件ID更新邮件的星标或已读状态。
+        - 当 is_read 状态改变时，同步更新 manually_marked_unread 状态。
         """
+        if is_starred is None and is_read is None:
+            logging.warning(f"未为邮件 ID: {email_id} 提供任何更新字段。")
+            return
+
         try:
             cursor = self.conn.cursor()
-            updates = []
-            params = []
+            
+            if is_read is not None:
+                # 如果 is_read 发生变化，则同时更新 is_read 和 manually_marked_unread
+                manually_marked_unread = not is_read  # True if marking as unread, False if marking as read
+                cursor.execute(
+                    "UPDATE emails SET is_read = ?, manually_marked_unread = ? WHERE id = ?",
+                    (is_read, manually_marked_unread, email_id)
+                )
+                logging.info(f"更新邮件 {email_id}: is_read={is_read}, manually_marked_unread={manually_marked_unread}")
 
             if is_starred is not None:
-                updates.append("is_starred = ?")
-                params.append(1 if is_starred else 0)
-            if is_read is not None:
-                updates.append("is_read = ?")
-                params.append(1 if is_read else 0)
+                # 如果 is_starred 发生变化，则只更新 is_starred
+                cursor.execute(
+                    "UPDATE emails SET is_starred = ? WHERE id = ?",
+                    (is_starred, email_id)
+                )
+                logging.info(f"更新邮件 {email_id}: is_starred={is_starred}")
 
-            if not updates:
-                logging.warning(f"未为邮件 ID: {email_id} 提供任何更新字段。")
-                return
-
-            query = f"UPDATE emails SET {', '.join(updates)} WHERE id = ?"
-            params.append(email_id)
-
-            cursor.execute(query, tuple(params))
             self.conn.commit()
             logging.info(f"成功更新邮件 ID: {email_id} 的状态。")
         except sqlite3.Error as e:

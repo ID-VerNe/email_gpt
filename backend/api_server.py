@@ -29,23 +29,6 @@ app = Flask(__name__, static_folder=build_dir, static_url_path='')
 # 为所有路由启用CORS，允许来自任何源的请求
 CORS(app)
 
-def get_db_connection():
-    """创建并返回一个数据库连接。"""
-    # 每次连接数据库时重新加载 .env 文件，确保获取最新配置
-    load_dotenv(override=True)
-    db_path = os.getenv('DB_PATH')
-    if not db_path:
-        logging.error("DB_PATH 环境变量未设置。")
-        raise ValueError("DB_PATH not configured in .env file")
-    
-    if not os.path.exists(db_path):
-        logging.error(f"数据库文件未找到: {db_path}")
-        raise FileNotFoundError(f"Database file not found at {db_path}")
-
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row  # 这让我们可以通过列名访问数据
-    return conn
-
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve(path):
@@ -58,55 +41,27 @@ def serve(path):
         return app.send_static_file('index.html')
 
 
+from backend.data_storage.email_data_manager import EmailDataManager
+
 @app.route('/api/emails', methods=['GET'])
 def get_emails():
     """获取所有邮件数据的API端点。"""
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # 每次请求时重新加载 .env 文件，确保获取最新配置
-        load_dotenv(override=True) # override=True 强制重新加载并覆盖现有环境变量
+        load_dotenv(override=True)
         mailbox_filter = os.getenv("MAILBOX")
         
-        if mailbox_filter:
-            # 如果 MAILBOX 存在，则按 mailbox 过滤邮件
-            cursor.execute("""
-                SELECT id, subject, from_name, from_email, received_date, 
-                       raw_email_body, analysis_markdown, analysis_json, mailbox, is_starred, is_read
-                FROM emails 
-                WHERE mailbox = ?
-                ORDER BY received_date DESC
-            """, (mailbox_filter,))
-            logging.info(f"正在获取邮箱 '{mailbox_filter}' 中的邮件。")
-        else:
-            # 如果 MAILBOX 不存在，则获取所有邮件（或者可以定义一个默认行为）
-            cursor.execute("""
-                SELECT id, subject, from_name, from_email, received_date, 
-                       raw_email_body, analysis_markdown, analysis_json, mailbox, is_starred, is_read
-                FROM emails 
-                ORDER BY received_date DESC
-            """)
-            logging.info("MAILBOX 环境变量未设置，获取所有邮件。")
+        manager = EmailDataManager()
+        emails_list = manager.get_all_emails(mailbox_filter=mailbox_filter)
+        manager.close()
 
-        emails_rows = cursor.fetchall()
-        conn.close()
-
-        emails_list = []
-        for row in emails_rows:
-            email_dict = dict(row)
-            # 尝试解析 analysis_json 字段
-            try:
-                if email_dict.get('analysis_json'):
-                    email_dict['analysis_json'] = json.loads(email_dict['analysis_json'])
-                else:
-                    email_dict['analysis_json'] = {}
-            except (json.JSONDecodeError, TypeError) as e:
-                logging.warning(f"邮件 ID {email_dict.get('id')} 的 analysis_json 解析失败: {e}. 将其设置为空字典。")
-                email_dict['analysis_json'] = {}
-            
-            emails_list.append(email_dict)
-            
+        # JSON 解析应在 DataManager 内部处理，但为保持兼容性，暂时保留
+        for email in emails_list:
+            if isinstance(email.get('analysis_json'), str):
+                try:
+                    email['analysis_json'] = json.loads(email['analysis_json'])
+                except (json.JSONDecodeError, TypeError):
+                    email['analysis_json'] = {}
+        
         return jsonify(emails_list)
     except Exception as e:
         logging.error(f"获取邮件时发生错误: {e}", exc_info=True)
@@ -128,9 +83,7 @@ def update_email_status(email_id):
         return jsonify({"error": "未提供有效的更新字段 (is_starred, is_read)"}), 400
 
     try:
-        from backend.data_storage.email_data_manager import EmailDataManager
         manager = EmailDataManager()
-        
         manager.update_email_status(email_id, is_starred=is_starred, is_read=is_read)
         
         # 获取更新后的邮件数据并返回
@@ -164,7 +117,6 @@ def update_email_urgency(email_id):
     new_urgency = data['urgency']
     
     try:
-        from backend.data_storage.email_data_manager import EmailDataManager
         manager = EmailDataManager()
         
         updated_email = manager.update_email_urgency(email_id, new_urgency)

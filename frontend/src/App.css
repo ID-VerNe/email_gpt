@@ -211,7 +211,15 @@ body {
 
 .email-read {
     background-color: #f8f9fa; /* 已读邮件的背景色 */
-    color: #6c757d; /* 已读邮件的文字颜色 */
+    color: #6c757d; /* 默认已读邮件的文字颜色 */
+}
+
+/* 只对文本部分应用删除线，这样星标就不会被划掉 */
+/* 删除线的颜色会自动匹配文本颜色（包括被覆盖的紧急度颜色）*/
+.email-read .email-subject,
+.email-read .email-from {
+    text-decoration: line-through;
+    text-decoration-thickness: 1px; /* 使删除线更细，不那么显眼 */
 }
 
 .email-read .email-subject {

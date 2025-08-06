@@ -457,6 +457,14 @@ function App() {
         }
     }, []);
 
+    const handleSelectEmail = (email) => {
+        // 当选择一封邮件时，只有在它未读且未被手动标记为未读的情况下，才自动标记为已读
+        if (email && !email.is_read && !email.manually_marked_unread) {
+            handleUpdateEmailStatus(email.id, { is_read: true });
+        }
+        setSelectedEmail(email);
+    };
+
     const fetchEmails = useCallback(async () => {
         try {
             setLoading(true);
@@ -578,7 +586,7 @@ function App() {
                 <>
                     <Sidebar 
                         groupedEmails={groupedEmails} 
-                        onSelectEmail={setSelectedEmail}
+                        onSelectEmail={handleSelectEmail}
                         onFilterChange={{
                             onUrgencyCycle: handleUrgencyCycle,
                             onReadCycle: handleReadCycle,
