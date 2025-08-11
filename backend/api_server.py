@@ -12,6 +12,7 @@ import subprocess
 import time
 import threading
 from backend.email_server.email_fetcher import EmailFetcher
+from backend.email_searcher import EmailSearcher
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -65,6 +66,27 @@ def get_emails():
         return jsonify(emails_list)
     except Exception as e:
         logging.error(f"获取邮件时发生错误: {e}", exc_info=True)
+        return jsonify({"error": "服务器内部错误", "message": str(e)}), 500
+
+@app.route('/api/search', methods=['GET'])
+def search_emails():
+    """根据查询参数搜索邮件。"""
+    query = request.args.get('query', '')
+    try:
+        searcher = EmailSearcher()
+        results = searcher.search(query)
+        
+        # 同样，确保 analysis_json 是字典
+        for email in results:
+            if isinstance(email.get('analysis_json'), str):
+                try:
+                    email['analysis_json'] = json.loads(email['analysis_json'])
+                except (json.JSONDecodeError, TypeError):
+                    email['analysis_json'] = {}
+        
+        return jsonify(results)
+    except Exception as e:
+        logging.error(f"搜索邮件时发生错误: {e}", exc_info=True)
         return jsonify({"error": "服务器内部错误", "message": str(e)}), 500
 
 @app.route('/api/emails/<int:email_id>/status', methods=['PUT'])

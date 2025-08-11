@@ -1,0 +1,211 @@
+/* Sidebar Styles */
+.sidebar {
+  width: 350px;
+  min-width: 300px;
+  background-color: #ffffff;
+  border-right: 1px solid #dfe1e6;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #dfe1e6;
+}
+
+.sidebar-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.header-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.sync-button, .settings-button {
+  background-color: #f0f0f0;
+  color: black;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.sync-button:hover, .settings-button:hover {
+  background-color: #0056b3;
+  color: white;
+}
+
+.filter-container-single {
+  padding: 15px 20px;
+  border-bottom: 1px solid #dfe1e6;
+  display: flex;
+  justify-content: space-around;
+  gap: 10px;
+}
+
+.filter-button-single {
+    flex-grow: 1;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: background-color 0.3s, color 0.3s;
+    white-space: nowrap;
+}
+
+/* Urgency States */
+.filter-button-single.urgency-all { background-color: #6c757d; color: white; }
+.filter-button-single.urgency-高 { background-color: #de350b; color: white; }
+.filter-button-single.urgency-中 { background-color: #ffab00; color: black; }
+.filter-button-single.urgency-低 { background-color: #36b37e; color: white; }
+
+/* Read States */
+.filter-button-single.read-all { background-color: #6c757d; color: white; }
+.filter-button-single.read-read { background-color: #0052cc; color: white; }
+.filter-button-single.read-unread { background-color: #f0f0f0; color: #333; }
+
+/* Starred States */
+.filter-button-single.starred-all { background-color: #6c757d; color: white; }
+.filter-button-single.starred-starred { background-color: gold; color: #333; }
+
+
+.email-list {
+  overflow-y: scroll;
+  flex-grow: 1;
+  padding: 10px 0;
+  padding-right: 17px; 
+}
+
+.year-group, .month-group, .day-group {
+  padding-left: 20px;
+}
+
+.collapsible {
+  cursor: pointer;
+  transition: background-color 0.2s;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 0;
+}
+
+.collapsible:hover {
+  background-color: #f0f0f0;
+}
+
+.collapsible span {
+  flex-grow: 1;
+}
+
+.collapsible .toggle-all-btn {
+  background-color: #ffffff;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 2px 8px;
+  font-size: 0.8em;
+  cursor: pointer;
+  color: #5e6c84;
+  margin-left: 10px;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+
+.collapsible .toggle-all-btn:hover {
+  background-color: #e6f7ff;
+  border-color: #0052cc;
+  color: #0052cc;
+}
+
+.year-group h3 {
+  margin: 15px 0 10px;
+  font-size: 1.2rem;
+}
+
+.month-group h4 {
+  margin: 10px 0 5px;
+  font-size: 1rem;
+  color: #5e6c84;
+}
+
+.day-group h5 {
+  margin: 8px 0 5px;
+  font-size: 0.9rem;
+  color: #6b778c;
+  border-bottom: 1px dashed #ccc;
+  padding-bottom: 5px;
+}
+
+.email-item {
+  padding: 12px 20px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s;
+}
+
+.email-item:hover {
+  background-color: #e6f7ff;
+}
+
+.email-item-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.email-subject {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+  flex-grow: 1;
+}
+
+.email-subject.urgency-high {
+  color: #de350b;
+}
+
+.email-subject.urgency-medium {
+  color: #ffab00;
+}
+
+.email-subject.urgency-low {
+  color: #36b37e;
+}
+
+.email-from {
+  font-size: 0.85rem;
+  color: #5e6c84;
+}
+
+.email-read {
+    background-color: #f8f9fa;
+    color: #6c757d;
+}
+
+.email-read .email-subject,
+.email-read .email-from {
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+}
+
+.email-read .email-subject {
+    font-weight: normal;
+}
+
+.star-icon {
+    color: gold;
+    font-size: 1.2em;
+    margin-left: 8px;
+}

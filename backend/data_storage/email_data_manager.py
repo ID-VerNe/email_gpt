@@ -247,6 +247,22 @@ class EmailDataManager:
         finally:
             self.conn.row_factory = None
 
+    def execute_query(self, query, params=()):
+        """
+        执行一个原始的SQL查询并返回结果。
+        """
+        try:
+            self.conn.row_factory = sqlite3.Row
+            cursor = self.conn.cursor()
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        except sqlite3.Error as e:
+            logging.error(f"执行查询失败: {query} with params {params}. Error: {e}")
+            return []
+        finally:
+            self.conn.row_factory = None
+
     def update_analysis_data(self, email_id, new_markdown, new_json):
         """
         根据邮件ID更新 analysis_markdown 和 analysis_json 字段。
