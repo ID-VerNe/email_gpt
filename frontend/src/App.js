@@ -53,6 +53,10 @@ function App() {
         }
     }, [debouncedQuery]);
 
+    const handleImmediateSearch = (query) => {
+        setDebouncedQuery(query);
+    };
+
     const handleUrgencyCycle = () => {
         const states = ['all', '高', '中', '低'];
         setUrgencyFilter(s => states[(states.indexOf(s) + 1) % states.length]);
@@ -213,6 +217,7 @@ function App() {
                 searchResults={searchResults}
                 onSelectEmail={handleSelectEmail}
                 isSearching={isSearching}
+                onImmediateSearch={handleImmediateSearch}
             />
             <div className="main-layout">
                 {showSettings ? (

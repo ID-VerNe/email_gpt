@@ -1,5 +1,6 @@
 import os
 import openai
+from datetime import datetime
 from dotenv import load_dotenv
 import logging
 
@@ -95,8 +96,13 @@ class EmailAnalyzer:
                     new_messages.append(msg)
             messages_to_send = new_messages
 
-        # 将系统prompt添加到消息列表的开头
+        # 获取当前日期
+        current_date = datetime.now().strftime("%Y年%m月%d日")
+        date_message = f"今天是{current_date}，请在你的回答中考虑这个信息。"
+
+        # 将系统prompt和日期信息添加到消息列表的开头
         messages_with_system_prompt = [{"role": "system", "content": "使用中文回复，请注意语言。"},
+                                       {"role": "system", "content": date_message},
                                        {"role": "system", "content": system_prompt}] + messages_to_send
 
         try:
