@@ -47,6 +47,18 @@ const Sidebar = ({ groupedEmails, onSelectEmail, onFilterChange, onSync, onShowS
             }
         };
 
+        const getCategoryValue = (email) => {
+            const categoryBlock = email.analysis_json?.['邮件摘要'] || email.analysis_json?.['郵件摘要'];
+            const category = categoryBlock?.[0]?.['**邮件分类**'] || categoryBlock?.[0]?.['**郵件分類**'];
+            switch (category) {
+                case '学术相关': return 1;
+                case '行政事务': return 2;
+                case '社交与个人': return 3;
+                case '推广与订阅': return 4;
+                default: return 5; // 其他分类
+            }
+        };
+
         const getTitleTypeValue = (title) => {
             if (/^\d/.test(title)) return 1;
             if (/^[a-zA-Z]/.test(title)) return 2;
@@ -59,6 +71,12 @@ const Sidebar = ({ groupedEmails, onSelectEmail, onFilterChange, onSync, onShowS
             const urgencyB = getUrgencyValue(b);
             if (urgencyA !== urgencyB) {
                 return urgencyA - urgencyB;
+            }
+
+            const categoryA = getCategoryValue(a);
+            const categoryB = getCategoryValue(b);
+            if (categoryA !== categoryB) {
+                return categoryA - categoryB;
             }
 
             const summaryBlockA = a.analysis_json?.['邮件摘要'] || a.analysis_json?.['郵件摘要'];
@@ -76,6 +94,11 @@ const Sidebar = ({ groupedEmails, onSelectEmail, onFilterChange, onSync, onShowS
         });
     };
 
+    const categoryEmail = (email) => {
+        const categoryBlock = email.analysis_json?.['邮件摘要'] || email.analysis_json?.['郵件摘要'];
+        const category = categoryBlock?.[0]?.['**邮件分类**'] || categoryBlock?.[0]?.['**郵件分類**'];
+        return category;
+    };
     const {
         onUrgencyCycle,
         onReadCycle,
@@ -109,6 +132,8 @@ const Sidebar = ({ groupedEmails, onSelectEmail, onFilterChange, onSync, onShowS
                     <div className={`email-subject ${getUrgencyClass(email)}`}>{summary}</div>
                     {email.is_starred ? <span className="star-icon">★</span> : null}
                 </div>
+                <div className={`email-category email-category-${categoryEmail(email) ? categoryEmail(email).replace(/\s+/g, '-').toLowerCase() : 'other'}`}>{categoryEmail(email)}</div>
+
                 <div className="email-from">{email.from_name || email.from_email}</div>
             </div>
         );

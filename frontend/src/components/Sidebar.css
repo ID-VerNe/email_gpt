@@ -209,3 +209,38 @@
     font-size: 1.2em;
     margin-left: 8px;
 }
+
+/* Email Category Styles */
+.email-category {
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-bottom: 4px;
+    display: inline-block;
+}
+
+.email-category-学术相关 {
+    background-color: #0052cc; /* Blue */
+    color: white;
+}
+
+.email-category-行政事务 {
+    background-color: #ffab00; /* Orange */
+    color: black;
+}
+
+.email-category-社交与个人 {
+    background-color: #36b37e; /* Green */
+    color: white;
+}
+
+.email-category-推广与订阅 {
+    background-color: #de350b; /* Red */
+    color: white;
+}
+
+.email-category-other {
+    background-color: #6c757d; /* Gray */
+    color: white;
+}
